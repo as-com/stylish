@@ -5,20 +5,10 @@ var d = document,
 	settings,
 	page_styles = {},
 	busy = false;
-	raf = requestAnimationFrame,
-	pageid = hash();
 
 if (typeof safari == 'object') {
 	safari.self.addEventListener("message", pong, false);
-
-	["pushstate", "popstate", "hashchange"].forEach(function(event){
-		w.addEventListener(event, function(event) {
-			removeAllStyles();
-			ping('getStyles', {url: dl.href});
-		}, false);
-	});
-
-	ping('getStyles', {url: dl.href});
+	ping('getStyles', dl.href);
 	d.addEventListener("stylishInstall", function(event) {pong(event);},false);
 	d.addEventListener("stylishUpdate", function(event) {pong(event);},false);
 	d.addEventListener("DOMContentLoaded", function(){
@@ -32,28 +22,39 @@ if (typeof safari == 'object') {
 		}
 	});
 */
+	d.addEventListener('DOMNodeRemoved', function(event) {
+		if (!busy && Object.size(page_styles)) {
+			if (event.relatedNode.localName == 'head' || event.relatedNode.localName == 'body' || event.target.localName == 'head' || event.target.localName == 'body') {
+				checkStyles(page_styles);
+			}
+		}
+	}, false);
+	
+	w.onpopstate = history.onpushstate = function(event) {
+		if (!busy) checkStyles(page_styles);
+	};
 
 }
 
 function injectStyle(css, id, element) {
 	if (!dl.host) return;
-//	if (w.self != w.top) return;
 	busy = true;
-	d.removeEventListener('DOMContentLoaded', checkRemovedElement);
+//	if (w != w.top) return;
 	removeStyle(id);
 	var regex_timer = /\?timer=(.\d)/gi,
 		regex_rnd = /\?rnd=(.\d)/gi,
 		time = (new Date()).getTime(),
 		timer = function(s,n) {return '?timer='+Math.floor(time/(1000*parseInt(n)))}, // Cache images for 10 minutes
-		rnd = '?rnd='+Math.random(),
-		style = element ? element : false;
+		rnd = '?rnd='+Math.random(), style = element ? element : false;
 	
 	if (!style) {
 		style = d.createElement('style');
 		style.id = '' + id;
-		//style.style.display = 'none !important';
-		//style.setAttribute('type', 'text/css');
-		//if (settings.minify == 'on') css = minify_css(css);
+//		style.style.display = 'none !important';
+//		style.setAttribute('type', 'text/css');
+//		style.className = 'stylish';
+		log(settings);
+		if (settings.minify == 'on') css = minify_css(css);
 		style.textContent = css.replace(regex_timer, timer).replace(regex_rnd, rnd);
 	}
 
@@ -66,42 +67,13 @@ function injectStyle(css, id, element) {
 			var style_exist = checkStyle(id);
 			if (style_exist && style_exist.parentNode.localName != 'body') {
 				inject(style_exist);
-			} else {
-				busy = false;
 			}
-			onDOMNodeRemoved();
 		}, false);
-	} else {
-		onDOMNodeRemoved();
-	}
-
-	function checkRemovedElement(event) {
-		if (busy) {
-			raf(function(){
-				checkRemovedElement(event);
-			});
-		} else {
-			if (Object.size(page_styles)) {
-				if (event.relatedNode.localName == 'head' || event.relatedNode.localName == 'body' || event.target.localName == 'head' || event.target.localName == 'body') {
-					checkStyles(page_styles);
-				}
-			}
-		}
-	}
-
-	function onDOMNodeRemoved() {
-		d.addEventListener('DOMNodeRemoved', checkRemovedElement, false);
 	}
 	
 	function inject(style) {
-		var target = d.body || d.head || d.documentElement;
-		if (target) {
-			//target.appendChild(style, null);
-			target.insertAdjacentElement('beforeend', style); // 
-			page_styles[id] = {css: css, element: style};
-		} else {
-
-		}
+		(d.body || d.documentElement || d.head).appendChild(style, null);
+		page_styles[id] = {css: css, element: style};
 		busy = false;
 	};
 }
@@ -111,25 +83,8 @@ function checkStyle(id) {
 }
 
 function checkStyles(page_styles) {
-	if (busy) {
-		raf(function(){
-			checkStyles(page_styles);
-		});
-	} else {
-		for (var id in page_styles) {
-			if (!checkStyle(id)) {
-				injectStyle(page_styles[id]['css'], id, page_styles[id]['element']);
-			}
-		}
-	}
-}
-
-function removeAllStyles() {
-	var styles = d.querySelectorAll('style[id^=""]');
-	if (styles && styles.length) {
-		styles.forEach(function(style) {
-			style.parentNode.removeChild(style);
-		});
+	for (var id in page_styles) {
+		if (!checkStyle(id)) injectStyle(page_styles[id]['css'], id, page_styles[id]['element']);
 	}
 }
 
@@ -139,7 +94,6 @@ function removeStyle(id) {
 }
 
 function ping(name, data) {
-	if (typeof data == 'object') data.sign = pageid;
 	safari.self.tab.dispatchMessage(name, data);
 }
  
@@ -151,7 +105,7 @@ function pong(event) {
 		metaid = getMeta('stylish-id-url')?getMeta('stylish-id-url').replace(/^https?:\/\/userstyles.org\/styles\//,''):false;
 	switch(n) {
 		case 'injectStyle':
-			if (m.sign == pageid) injectStyle(m.css, m.id);
+			if (m.location == dl.href) injectStyle(m.css, m.id);
 		break;
 		case 'removeStyle':
 			removeStyle(m.id);
@@ -167,13 +121,14 @@ function pong(event) {
 			ping('applyStyle',{id: m.id, href: dl.href});
 		break;
 		case 'checkInstall':
-			sendEvent(m ? 'styleAlreadyInstalled' : 'styleCanBeInstalled');
+			log(m);
+			sendEvent(m?'styleAlreadyInstalled':'styleCanBeInstalled');
 		break;
 		case 'updateSettings':
 			settings = m;
 		break;
 		case 'applyStyle':
-			ping('applyStyle',{id: m.id, href: dl.href});
+			ping('applyStyle',{'id':m.id, 'href':dl.href});
 			if (metaid && m.id && m.id == metaid) sendEvent('styleAlreadyInstalled');
 		break;
 		case 'log':
@@ -191,15 +146,15 @@ function pong(event) {
 }
 
 function stylishInstallGlobal(id) {
-	ping('installStyle', {
-		id: id,
-		options: getOptions(true)
+	ping('installStyle',{
+		id:id,
+		options:getOptions(true)
 	});
 };
 function stylishUpdateGlobal(id) {
-	ping('installStyle', {
-		id: id,
-		options: getOptions(true)
+	ping('installStyle',{
+		id:id,
+		options:getOptions(true)
 	});
 };
 function getOptions(asjson) {
@@ -235,9 +190,7 @@ function log(l) {
 
 function userstyles() {
 	var sid = getMeta('stylish-id-url').replace(/^https?:\/\/userstyles.org\/styles\//,'');
-	ping('checkInstall', {
-		sid: sid
-	});
+	ping('checkInstall',sid);
 };
 
 function sendEvent(name) {
@@ -335,10 +288,6 @@ function minify_css(css){
 	after = css.length;
 	//log('Optimized by: '+Math.round(100-after*100/before)+'%');
 	return css;
-}
-
-function hash() {
-	return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 }
 
 /**

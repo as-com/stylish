@@ -49,6 +49,8 @@ var DB = {
 
 				DB.set('dbversion', 3);
 			}
+
+
 			
 			DB.set('settings', default_settings);
 
@@ -61,20 +63,23 @@ var DB = {
 var usss = 'https://userstyles.org/styles/browse/', href,
 	w = window,
 	page,
-	skip_items = ['uuid', 'settings', 'dbversion', 'ad'],
+	skip_items = ['uuid', 'settings', 'dbversion'],
 	default_settings = {
 		context: 'on',
 		minify: 'on',
-		tracking: 'on'
+		tracking: 'on',
+		support: 'on'
 	},
 	settings;
 
 DB.upgrade();
 
-settings = loadSettings(); // safari.extension.settings.settings
+settings = loadSettings();
+
+// safari.extension.settings.settings
 
 function ping(event, name, data) {
-	if (page = event.target.page) {
+	if ( page = event.target.page) {
 		page.dispatchMessage(name, data);
 	}
 }
@@ -131,21 +136,21 @@ function pong(event) {
 			}
 		break;
 		case 'checkInstall':
-			ping(event, 'checkInstall', DB.size() ? DB.check(m.sid) : false);
+			ping(event, 'checkInstall', DB.size() ? DB.check(m) : false);
 		break;
 		case 'getStyles':
 			ping(event, 'updateSettings', settings);
 			if (l = DB.size()) {
-				for (var i=0; i<l; i++) {
+				for (var i=0;i<l;i++) {
 					var id = DB.key(i);
 					if (skip_items.indexOf(id) < 0) {
 						var json = DB.get(id),
 							id = DB.key(i),
 							filter, css;
 						if (json.enabled) {
-							if (filter = json.sections.filter(function(section) { return filterSection(m.url, section)})) {
+							if (filter = json.sections.filter(function(section) { return filterSection(m,section)})) {
 								if (css = filter.map(function(section) {return section.code;}).join("\n")) {
-									ping(event, 'injectStyle', {css: css, id: id, location: m.url, sign: m.sign});
+									ping(event, 'injectStyle', {css: css, id: id, location: m});
 								}
 							}
 						}
@@ -159,7 +164,7 @@ function pong(event) {
 			if (json.enabled) {
 				if (filter = json.sections.filter(function(section) { return filterSection(m.href,section)})) {
 					if (css = filter.map(function(section) {return section.code;}).join("\n")) {
-						ping(event, 'injectStyle', {css: css, id: m.id, location: m.href, sign: m.sign});
+						ping(event, 'injectStyle', {css: css, id: m.id, location: m.href});
 					}
 				}
 			}
@@ -179,9 +184,6 @@ function pong(event) {
 		break;
 		case 'loadSettings':
 			ping(event, 'loadSettings', settings);
-		break;
-		case 'showAd':
-			showAd();
 		break;
 		
 	}
@@ -235,7 +237,7 @@ function deleteStyle(id) {
 
 function submitStyle(id) {
 	var json = DB.get(id), token;
-	//log(json);
+	log(json);
 
 	var css = '@namespace url(http://www.w3.org/1999/xhtml);@-moz-document domain("facebook.com") {body {}}';
 
@@ -243,7 +245,7 @@ function submitStyle(id) {
 	get('https://userstyles.org/styles/71868/edit', null, function(html) {
 		
 		token = html.match(/authenticity_token" value="(.*?)" \/>/)[1];
-		//log(token);
+		log(token);
 
 		var id = 71868;
 
@@ -286,9 +288,11 @@ function manageStyles() {
 
 function findMore() {
 	var url = safari.application.activeBrowserWindow.activeTab.url,
-		host = getHost(url);
-	if (host != 'com.sobolev.stylish-5555L95H45') {
-		safari.application.activeBrowserWindow.openTab().url = safari.extension.baseURI + "search.html#" + host;
+		host = getHost(url),
+		newTab;
+	if (host!='com.sobolev.stylish-5555L95H45') {
+		newTab = safari.application.activeBrowserWindow.openTab();
+		newTab.url = safari.extension.baseURI + "search.html#"+host;
 	}
 };
 
@@ -319,7 +323,7 @@ function log(e) {
 };
 
 function analytics(data) {
-	//log(settings);
+	log(settings);
 	if (settings.tracking != 'on') return;
 	if (!DB.check('uuid')) DB.set('uuid', uuid_v4());
 	var uaid = 'UA-72374231-1',
@@ -399,6 +403,7 @@ function contextmenu(event) {
 //	}
 }
 
+<<<<<<< HEAD
 analytics({type:'screenview', title:'Global'});
 
 function showAd() {
@@ -438,3 +443,6 @@ function getAdUrl(callback) {
 	request.send();
 
 }
+=======
+analytics({type:'screenview', title:'Global'});
+>>>>>>> parent of 0341432... 2.0.6

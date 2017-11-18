@@ -181,23 +181,20 @@ function pong(event) {
 		break;
 		case 'loadSettings':
 			$.each(m, function(name, value){
-				var input = $('input[name="'+name+'"]');
-				if (input.length) {
-					var type = input.get(0).type;
-					switch(type) {
-						case 'checkbox':
-							if (value == 'on') {
-								input.attr({checked: 'checked'});
-							} else {
-								input.removeAttr('checked');
-							}
-						break;
-						case 'input':
-						case 'select':
-						case 'textarea':
-							input.val(value);
-						break;
-					}
+				var input = $('input[name="'+name+'"]'), type = input.get(0).type;
+				switch(type) {
+					case 'checkbox':
+						if (value == 'on') {
+							input.attr({checked: 'checked'});
+						} else {
+							input.removeAttr('checked');
+						}
+					break;
+					case 'input':
+					case 'select':
+					case 'textarea':
+						input.val(value);
+					break;
 				}
 			});
 		break;
@@ -206,6 +203,4 @@ function pong(event) {
 
 function log(e) {console.log(e)};
 
-function ping(name,data) {safari.self.tab.dispatchMessage(name,data)};
-
-safari.self.addEventListener("message", pong, true);
+function ping(name,data) {safari.self.tab.dispatchMessage(name,data)};safari.self.addEventListener("message", pong, true);
